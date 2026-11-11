@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="{{.lang}}">
+<head>
+    <meta charset="utf-8">
+    <title>{{.title}}</title>
+    <link type="text/css" rel="stylesheet" href="/css/main.css?v{{.static.ver}}">
+</head>
+<body>
+    <header class="main-header">
+        <h1>{{.title}}</h1>
+        <a class="logo" href="/" title="{{.title}}">
+            <img src="{{.logoSrc}}">
+            <span class="slogan">{{.slogan}}</span>
+        </a>
+        <p class="description">{{.description}}</p>
+    </header>
+    {{ if .warning.set("$msg") }}
+        <div class="warinig">{{$msg}}</div>
+    {{ end }}
+    <div id="container">
+        {{.include("/pages/users.html")}}
+    </div>
+    <script>console.log("Page-data: ", {{.data.json.raw}});</script>
+</body>
+</html>

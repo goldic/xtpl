@@ -1,0 +1,9 @@
+h2 Users list
+
+if users.set("$users")
+    ul: range $users
+        li(data-user="{{.}}") ({{$key.sum(1)}})&nbsp;
+            b {{name}}
+
+if $users.empty
+    p Empty users-list

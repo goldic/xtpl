@@ -1,0 +1,19 @@
+doctype html
+html(lang="{{lang}}")
+    head
+        meta(charset="utf-8")
+        title {{title}}
+        link(type="text/css" rel="stylesheet" href="/css/main.css?v{{static.ver}}")
+    body
+        header.main-header
+            h1 {{title}}
+            a.logo(href="/" title="{{title}}")
+                img(src="{{logoSrc}}")
+                span.slogan {{slogan}}
+            p.description {{description}}
+        if warning.set("$msg")
+            div.warinig {{$msg}}
+        #container
+            | {{include("/pages/users.pug")}}
+        script
+            | console.log("Page-data: ", {{data.json.raw}});

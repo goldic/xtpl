@@ -1,0 +1,11 @@
+<h2>Users list</h2>
+{{ if .users.set("$users") }}
+<ul>
+    {{ range $users }}
+    <li data-user="{{.}}">({{$key.sum(1)}})&nbsp;<b>{{.name}}</b></li>
+    {{ end }}
+</ul>
+{{ end }}
+{{ if $users.len.not }}
+<p>Empty users-list</p>
+{{ end }}

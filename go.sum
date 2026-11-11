@@ -1,0 +1,4 @@
+github.com/goldic/fsys v0.0.0-20261111155246-a781df5f0df7 h1:5zI63ESNYEn0rKhxFddQQMBrP/J6Fl2Kl7LSHX52wHE=
+github.com/goldic/fsys v0.0.0-20261111155246-a781df5f0df7/go.mod h1:yLVuhGbOE/sAPO5gd6Rpf8fTBuZE+Mz426MIcoGBPo8=
+github.com/goldic/js v0.2.0 h1:RLkOCGV32f+/RFQ80OWf4NfRvnBx65an2quqWTWSehk=
+github.com/goldic/js v0.2.0/go.mod h1:vK8FJ+iwOsSVlFA9VsWAlW7euyEIbi9mrKrrIt5qvfQ=
