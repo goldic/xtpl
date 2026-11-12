@@ -1,5 +1,7 @@
 # xtpl
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/goldic/xtpl.svg)](https://pkg.go.dev/github.com/goldic/xtpl)
+
 xtpl is a Go template engine with chained expressions, optional-style access to
 missing object properties, template collections, and support for HTML, plain
 text, and a simplified Pug-like syntax. It requires Go 1.24 or later.
@@ -26,9 +28,11 @@ import (
 )
 
 func main() {
-    source := `h1 Hello, {{name}}!
+    const source = `
+h1 Hello, {{name}}!
 p Welcome to {{site}}.
-a(href="{{profileURL}}") View profile`
+a(href="{{profileURL}}") View profile
+`
 
     tpl, err := xtpl.ParsePugTemplate(strings.NewReader(source))
     if err != nil {
@@ -64,13 +68,15 @@ value is non-empty. Inside the loop, expressions refer to the current item.
 Replace `source` and `data` in the program above with:
 
 ```go
-source := `h1 {{title}}
+source := `
+h1 {{title}}
 ul
   range users
     li
       b {{name}}
       if online
-        span.online online`
+        span.online online
+`
 
 data := map[string]any{
     "title": "Members",
@@ -239,6 +245,18 @@ Some invalid function calls and panics are currently suppressed, while some
 other errors, such as an out-of-range direct slice access, are returned by
 `Execute`. Do not rely on suppression to validate template input.
 
+## Optional web functions
+
+Import `webfuncs` to register `randIcon`, `randColor`, and `hash64`:
+
+```go
+import _ "github.com/goldic/xtpl/webfuncs"
+```
+
+The icon and color functions select a value deterministically from a seed. See
+the [webfuncs reference](https://pkg.go.dev/github.com/goldic/xtpl/webfuncs)
+for details. These functions are not intended for cryptographic use.
+
 ## Template collections
 
 `ParseFS` accepts `fs.FS`, including `embed.FS`; `ParseDir` also supports the
@@ -276,7 +294,8 @@ import (
 )
 
 func main() {
-    source := `p {{message}}
+    const source = `
+p {{message}}
 a(href="{{profileURL}}") Open`
     tpl, err := xtpl.ParsePugTemplate(strings.NewReader(source))
     if err != nil {

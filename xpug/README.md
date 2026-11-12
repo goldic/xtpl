@@ -1,5 +1,7 @@
 # xpug
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/goldic/xtpl/xpug.svg)](https://pkg.go.dev/github.com/goldic/xtpl/xpug)
+
 xpug parses a **simplified Pug-like format** into a small syntax tree and renders it as HTML or XML. It is part of the xtpl module and requires Go 1.24 or later.
 
 This is not a complete implementation of Pug and does not aim for full Pug compatibility. In particular, xpug's directives have their own syntax and behavior. They generate text for a subsequent template engine; they do not evaluate expressions or load files. You can register additional directive renderers.
