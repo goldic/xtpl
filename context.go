@@ -1,8 +1,10 @@
 package xtpl
 
 import (
+	"fmt"
 	"io"
 	"reflect"
+	"strings"
 )
 
 // Context provides output, template lookup, and variables to context functions.
@@ -103,20 +105,26 @@ func (ctx *context) exec(e *Expression) (err error) {
 
 	default:
 		val := ctx.eval(e)
-		r, ok := val.(io.Reader) // is io.Reader
-		if !ok {
-			if t := ctx.tpl; t != nil && t.esc != nil {
-				r = t.esc(val)
-			} else {
-				r = Raw(val)
-			}
+		if raw, ok := val.(Raw); ok {
+			_, err = io.WriteString(ctx.Writer, string(raw))
+			return
 		}
-		defer func() {
-			if c, _ := r.(io.Closer); c != nil {
-				c.Close()
+		if r, ok := val.(io.Reader); ok {
+			if c, ok := r.(io.Closer); ok {
+				defer c.Close()
 			}
-		}()
-		_, err = io.Copy(ctx.Writer, r)
+			var b []byte
+			b, err = io.ReadAll(r)
+			if err != nil {
+				return fmt.Errorf("xtpl: read expression: %w", err)
+			}
+			val = string(b)
+		}
+		if t := ctx.tpl; t != nil && t.esc != nil {
+			_, err = io.Copy(ctx.Writer, t.esc(val))
+		} else {
+			_, err = io.Copy(ctx.Writer, strings.NewReader(toString(val)))
+		}
 	}
 	return
 }
@@ -141,7 +149,11 @@ func (ctx *context) calArgs(args []*Expression) []reflect.Value {
 	res := make([]reflect.Value, len(args))
 	for i, e := range args {
 		if v := ctx.val(e); isValid(v) {
-			res[i] = reflect.ValueOf(v.Interface())
+			if v.Kind() == reflect.Interface || v.CanAddr() || !v.CanInterface() {
+				res[i] = reflect.ValueOf(v.Interface())
+			} else {
+				res[i] = v
+			}
 		} else {
 			res[i] = vNil
 		}
@@ -156,6 +168,23 @@ func (ctx *context) val(e *Expression) (res reflect.Value) {
 	switch e.op {
 	case opError, opConst:
 		return e.cVal
+	case opEscape:
+		value := ctx.eval(e.args[0])
+		if _, ok := value.(Raw); ok {
+			return reflect.ValueOf(value)
+		}
+		if reader, ok := value.(io.Reader); ok {
+			if closer, ok := reader.(io.Closer); ok {
+				defer closer.Close()
+			}
+			data, err := io.ReadAll(reader)
+			check(err)
+			value = string(data)
+		}
+		for _, escape := range e.escapes {
+			value = escape(value)
+		}
+		return reflect.ValueOf(Raw(toString(value)))
 
 	case opMethod:
 		name := e.expr

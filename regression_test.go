@@ -16,24 +16,20 @@ func TestRejectsIncompleteTemplates(t *testing.T) {
 		`{{.`, `{{'abc}}`, `{{.name)}}`, `{{/* comment}}`,
 	} {
 		t.Run(source, func(t *testing.T) {
-			if _, err := ParseTextTemplate(strings.NewReader(source)); err == nil {
-				t.Fatalf("accepted incomplete template %q", source)
-			}
+			_, err := ParseTextTemplate(strings.NewReader(source))
+			require(t, err != nil, "expected an incomplete template error")
 		})
 	}
-	if _, err := ParseTemplate("text", "", "}}", nil); err == nil {
-		t.Fatal("accepted an empty delimiter")
-	}
+	_, err := ParseTemplate("text", "", "}}", nil)
+	require(t, err != nil, "expected an empty delimiter error")
 }
 
 func TestParseFSReturnsErrors(t *testing.T) {
-	if _, err := ParseFS(fstest.MapFS{"bad.html": {Data: []byte(`{{#}}`)}}); err == nil || !strings.Contains(err.Error(), "bad.html") {
-		t.Fatalf("expected an error naming bad.html, got %v", err)
-	}
+	_, err := ParseFS(fstest.MapFS{"bad.html": {Data: []byte(`{{#}}`)}})
+	assertErrContains(t, err, "bad.html")
 	sentinel := errors.New("open failed")
-	if _, err := ParseFS(failingFS{err: sentinel}); !errors.Is(err, sentinel) {
-		t.Fatalf("expected original filesystem error, got %v", err)
-	}
+	_, err = ParseFS(failingFS{err: sentinel})
+	assertErrIs(t, err, sentinel)
 }
 
 type failingFS struct{ err error }
@@ -49,24 +45,14 @@ func TestMissingAndFailedIncludes(t *testing.T) {
 		"index.html": {Data: []byte(`{{.include('child')}}`)},
 		"child.html": {Data: []byte(`hello`)},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	sentinel := errors.New("write failed")
-	if err := tpls.Execute(failingWriter{sentinel}, nil); !errors.Is(err, sentinel) {
-		t.Fatalf("expected nested writer error, got %v", err)
-	}
+	assertErrIs(t, tpls.Execute(failingWriter{sentinel}, nil), sentinel)
 	missing, err := ParseTextTemplate(strings.NewReader(`{{.include('absent')}}`))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	tpls.Add("missing", missing)
-	if err := missing.Execute(io.Discard, nil); err == nil || !strings.Contains(err.Error(), "absent") {
-		t.Fatalf("expected missing include error, got %v", err)
-	}
-	if err := NewTemplates().Execute(io.Discard, nil); err == nil {
-		t.Fatal("expected missing index error")
-	}
+	assertErrContains(t, missing.Execute(io.Discard, nil), "absent")
+	require(t, NewTemplates().Execute(io.Discard, nil) != nil, "expected a missing index error")
 }
 
 func TestCacheAndSubstringBoundaries(t *testing.T) {
@@ -83,19 +69,19 @@ func TestCacheAndSubstringBoundaries(t *testing.T) {
 		{`{{.index(4)}}`, []int{1}, ""},
 		{`{{.index(-1)}}`, []int{1}, ""},
 	} {
-		got, err := Eval(tc.source, tc.value)
-		if err != nil || got != tc.want {
-			t.Errorf("%s: got %q, %v; want %q", tc.source, got, err, tc.want)
-		}
+		t.Run(tc.source, func(t *testing.T) {
+			got, err := Eval(tc.source, tc.value)
+			assertNoErr(t, err)
+			assertEqual(t, tc.want, got)
+		})
 	}
 }
 
 func TestOptionalChainingRemainsEmpty(t *testing.T) {
 	for _, value := range []any{nil, map[string]any{}, map[string]any{"nilObject": (*User)(nil)}} {
 		got, err := Eval(`{{nilObject.attr1.attr2}}`, value)
-		if err != nil || got != "" {
-			t.Fatalf("got %q, %v", got, err)
-		}
+		assertNoErr(t, err)
+		assertEqual(t, "", got)
 	}
 }
 
@@ -104,14 +90,8 @@ func TestParseFSNameCollisionOrder(t *testing.T) {
 		"index.html": {Data: []byte("html")},
 		"index.pug":  {Data: []byte("p pug")},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assertNoErr(t, err)
 	var out bytes.Buffer
-	if err := tpls.Execute(&out, nil); err != nil {
-		t.Fatal(err)
-	}
-	if out.String() != "<p>pug</p>" {
-		t.Fatalf("unexpected selected index: %q", out.String())
-	}
+	assertNoErr(t, tpls.Execute(&out, nil))
+	assertEqual(t, "<p>pug</p>", out.String())
 }

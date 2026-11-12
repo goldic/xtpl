@@ -1,0 +1,18 @@
+section#security
+    h2 HTML text and attributes
+    p.message {{message}}
+    span(title="{{attribute}}") Attribute
+    textarea {{message}}
+    h2 URLs
+    a#unsafe(href="{{unsafeURL}}") Unsafe URL
+    a#safe(href="{{safeURL}}") Safe URL
+    a#search(href="/search?q={{query}}") Search
+    img(srcset="{{srcset}}")
+    h2 JavaScript
+    script
+        | const data = {{payload}};
+        | const text = "{{message}}";
+    h2 CSS
+    div(style="color:{{color}}") Color
+    h2 Explicitly trusted HTML
+    div {{trusted}}

@@ -12,12 +12,13 @@ import (
 
 // Expression is a parsed expression that can be evaluated against a value.
 type Expression struct {
-	op    int
-	expr  string
-	args  []*Expression
-	cVal  reflect.Value
-	cdata []byte
-	path  string // cache path
+	op      int
+	expr    string
+	args    []*Expression
+	cVal    reflect.Value
+	cdata   []byte
+	path    string // cache path
+	escapes []escapeFunc
 }
 
 // Getter supplies named properties to expressions.
@@ -34,6 +35,7 @@ const (
 	opRoot
 	opIf
 	opRange
+	opEscape
 )
 
 // ErrorInvalidExpression is rendered by NewExpression when parsing fails.
@@ -133,11 +135,10 @@ func (b *buffer) readN(n int) string {
 }
 
 func (b *buffer) read(alphabet func(byte) bool) string {
-	var rr []byte
+	start := b.i
 	for ; b.cur > 0 && alphabet(b.cur); b.next() {
-		rr = append(rr, b.cur)
 	}
-	return string(rr)
+	return string(b.r[start:b.i])
 }
 
 func (b *buffer) readName() string {

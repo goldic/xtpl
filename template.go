@@ -3,10 +3,11 @@ package xtpl
 import (
 	"bytes"
 	"fmt"
-	"github.com/goldic/xpug"
 	"io"
 	"reflect"
 	"strings"
+
+	"github.com/goldic/xtpl/xpug"
 )
 
 // Template is a parsed template that can be executed with different data.
@@ -17,6 +18,7 @@ type Template struct {
 }
 
 var pugPrettyOutput bool
+var pugAutoEscape = true
 
 // SetPrettyOutput controls formatting when parsing Pug templates. Configure it
 // before parsing templates concurrently.
@@ -24,7 +26,15 @@ func SetPrettyOutput(pretty bool) {
 	pugPrettyOutput = pretty
 }
 
-// SetDefaultEscapeFunc sets the escape function used for non-reader values.
+// SetAutoEscape enables or disables context-aware escaping for Pug templates.
+// It affects templates parsed after the call and is enabled by default.
+// Configure it before parsing templates concurrently.
+func SetAutoEscape(enabled bool) {
+	pugAutoEscape = enabled
+}
+
+// SetDefaultEscapeFunc sets the escape function for text and HTML templates.
+// Pug templates use compiled context-specific escaping when it is enabled.
 // Configure templates before executing them concurrently.
 func (tpl *Template) SetDefaultEscapeFunc(fn func(any) io.Reader) {
 	if tpl != nil {
@@ -37,7 +47,8 @@ func NewErrorTemplate(err string) *Template {
 	return &Template{e: &Expression{op: opError, cVal: reflect.ValueOf(err)}}
 }
 
-// ParsePugTemplate parses a simplified Pug template as HTML or XML.
+// ParsePugTemplate parses a simplified Pug template with context-aware escaping
+// enabled by default.
 func ParsePugTemplate(r io.Reader) (tpl *Template, err error) {
 	defer catch(&err)
 
@@ -50,15 +61,27 @@ func ParsePugTemplate(r io.Reader) (tpl *Template, err error) {
 	} else {
 		output = doc.String()
 	}
-	return ParseHTMLTemplate(bytes.NewBufferString(output))
+	tpl, err = ParseTextTemplate(bytes.NewBufferString(output))
+	if err != nil {
+		return nil, err
+	}
+	if pugAutoEscape {
+		if err = preparePugEscaping(doc, tpl); err != nil {
+			return nil, err
+		}
+	}
+	return tpl, nil
 }
 
 // ParseHTMLTemplate parses a template using HTML text escaping by default.
 // Escaping is not context-aware; see the package security documentation.
 func ParseHTMLTemplate(r io.Reader) (tpl *Template, err error) {
 	tpl, err = ParseTextTemplate(r)
+	if err != nil {
+		return nil, err
+	}
 	tpl.SetDefaultEscapeFunc(HTML)
-	return
+	return tpl, nil
 }
 
 // ParseTextTemplate parses a template with {{ and }} delimiters and no escaping.
@@ -111,7 +134,7 @@ func ParseTemplate(
 				}
 				continue
 			}
-			pfx := strings.SplitN(sLine, " ", 2)[0]
+			pfx, _, _ := strings.Cut(sLine, " ")
 			switch pfx {
 			case "if":
 				push(&Expression{

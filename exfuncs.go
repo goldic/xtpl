@@ -87,8 +87,18 @@ func init() {
 		return p
 	})
 
+	//------- escape funcs ---
+	AddFunc("_html", func(v any) Raw { return Raw(escapeHTML(v).(string)) })
+	AddFunc("_htmlAttr", func(v any) Raw { return Raw(escapeHTML(v).(string)) })
+	AddFunc("_url", func(v any) Raw { return Raw(escapeHTML(escapeURLNormalize(escapeURLFilter(v))).(string)) })
+	AddFunc("_json", func(v any) Raw { return rawValue(JSON(v)) })
+	AddFunc("_jsstr", func(v any) Raw { return Raw(escapeJSString(v).(string)) })
+	AddFunc("_css", func(v any) Raw { return Raw(escapeCSSValue(v).(string)) })
+
 	//--- string funcs ---
-	AddFunc("raw", Raw)
+	AddFuncEx("raw", func(_ Context, args []reflect.Value) reflect.Value {
+		return reflect.ValueOf(rawValue(args[0].Interface()))
+	})
 	AddFunc("html", HTML)
 	AddFunc("json", JSON)
 	AddFunc("fmt,printf", func(v any, format string) string { return fmt.Sprintf(format, v) })
@@ -262,15 +272,24 @@ func JSON(v any) io.Reader {
 	return bytes.NewBuffer(b)
 }
 
-// Raw returns a reader for v without HTML escaping.
-func Raw(v any) io.Reader {
+// Raw is explicitly trusted output and bypasses automatic escaping in all contexts.
+// Never construct it from untrusted content.
+type Raw string
+
+func rawValue(v any) Raw {
 	if r, ok := v.(io.Reader); ok {
-		return r
+		if c, ok := r.(io.Closer); ok {
+			defer c.Close()
+		}
+		return Raw(string(must(io.ReadAll(r))))
 	}
-	return bytes.NewBufferString(toString(v))
+	return Raw(toString(v))
 }
 
 func toString(val any) string {
+	if s, ok := val.(string); ok {
+		return s
+	}
 	if IsNil(val) {
 		return ""
 	}
@@ -314,6 +333,27 @@ func forEach(val any, fn func(k, v any)) {
 	}
 	vv := reflect.ValueOf(val)
 	switch vv.Kind() {
+	case reflect.Func:
+		if vv.IsNil() {
+			return
+		}
+		// A named function may also implement Fetch, which ran above.
+		if _, ok := val.(interface{ Fetch(func(any)) }); ok {
+			return
+		}
+		sequenceType := vv.Type()
+		switch {
+		case sequenceType.CanSeq2() && sequenceType.In(0).Out(0) == reflect.TypeOf(true):
+			for key, value := range vv.Seq2() {
+				fn(key.Interface(), value.Interface())
+			}
+		case sequenceType.CanSeq() && sequenceType.In(0).Out(0) == reflect.TypeOf(true):
+			index := 0
+			for value := range vv.Seq() {
+				fn(index, value.Interface())
+				index++
+			}
+		}
 	case reflect.Slice, reflect.Array, reflect.String:
 		for i, n := 0, vv.Len(); i < n; i++ {
 			fn(i, vv.Index(i).Interface())

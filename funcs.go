@@ -27,7 +27,7 @@ func AddFunc(name string, fn any) error {
 	if v.Kind() != reflect.Func {
 		panic("xtpl.AddFunc: invalid func")
 	}
-	for _, name := range strings.Split(name, ",") {
+	for name := range strings.SplitSeq(name, ",") {
 		funcs[name] = v
 	}
 	return nil

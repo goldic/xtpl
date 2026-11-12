@@ -18,8 +18,8 @@ func TestParseExpr(t *testing.T) {
 		` .Param . Param . abs( +123, -123.78 , " abc 123").Abc`,
 	} {
 		expr, err := ParseExpression(strExpr)
+		assertNoErr(t, err)
 		require(t, expr != nil)
-		require(t, err == nil)
 	}
 }
 
