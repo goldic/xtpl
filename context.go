@@ -222,6 +222,47 @@ func (ctx *context) val(e *Expression) (res reflect.Value) {
 	return
 }
 
+func getProperty(v reflect.Value, name string) reflect.Value {
+	for isValid(v) {
+		switch v.Kind() {
+		case reflect.Interface, reflect.Pointer, reflect.Map:
+			if v.IsNil() {
+				return reflect.Value{}
+			}
+		}
+		if v.CanInterface() {
+			if getter, ok := v.Interface().(Getter); ok {
+				return reflect.ValueOf(getter.Get(name))
+			}
+		}
+		switch v.Kind() {
+		case reflect.Interface, reflect.Pointer:
+			v = v.Elem()
+		case reflect.Map:
+			key := reflect.ValueOf(name)
+			if !key.Type().AssignableTo(v.Type().Key()) {
+				if !key.Type().ConvertibleTo(v.Type().Key()) {
+					return reflect.Value{}
+				}
+				key = key.Convert(v.Type().Key())
+			}
+			return v.MapIndex(key)
+		case reflect.Struct:
+			if name != "" {
+				if f, ok := v.Type().FieldByName(golangName(name)); ok {
+					if field, err := v.FieldByIndexErr(f.Index); err == nil && field.CanInterface() {
+						return field
+					}
+				}
+			}
+			return reflect.Value{}
+		default:
+			return reflect.Value{}
+		}
+	}
+	return reflect.Value{}
+}
+
 func fieldOfValue(v reflect.Value, name string, args []reflect.Value) (res reflect.Value) {
 	if !isValid(v) {
 		return

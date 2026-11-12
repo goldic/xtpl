@@ -136,12 +136,12 @@ func TestExplicitEscapeFunctions(t *testing.T) {
 		value            any
 		want             string
 	}{
-		{"HTML", `{{._html}}`, `<b>&</b>`, `&lt;b&gt;&amp;&lt;/b&gt;`},
-		{"attribute", `{{._htmlAttr}}`, `"x"`, `&#34;x&#34;`},
-		{"URL", `{{._url}}`, `javascript:alert(1)`, `#ZgotmplZ`},
-		{"JSON", `{{._json}}`, map[string]string{"value": `</script>`}, `{"value":"\u003c/script\u003e"}`},
-		{"JavaScript string", `{{._jsstr}}`, `</script>`, `\u003c\/script\u003e`},
-		{"CSS", `{{._css}}`, `red; background:url(javascript:alert(1))`, `ZgotmplZ`},
+		{"HTML", `{{.html}}`, `<b>&</b>`, `&lt;b&gt;&amp;&lt;/b&gt;`},
+		{"attribute", `{{.htmlAttr}}`, `"x"`, `&#34;x&#34;`},
+		{"URL", `{{.url}}`, `javascript:alert(1)`, `#ZgotmplZ`},
+		{"JSON", `{{.json}}`, map[string]string{"value": `</script>`}, `{"value":"\u003c/script\u003e"}`},
+		{"JavaScript string", `{{.jsstr}}`, `</script>`, `\u003c\/script\u003e`},
+		{"CSS", `{{.css}}`, `red; background:url(javascript:alert(1))`, `ZgotmplZ`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -155,14 +155,14 @@ func TestExplicitEscapeFunctions(t *testing.T) {
 func TestPugConditionalAndRangeEscaping(t *testing.T) {
 	source := `div
   if show
-    a(href="{{url}}") {{label}}
+    a(href="{{profileURL}}") {{label}}
   ul
     range users
       li {{name}}`
 	tpl, err := ParsePugTemplate(strings.NewReader(source))
 	assertNoErr(t, err)
 	data := map[string]any{
-		"show": true, "url": "javascript:alert(1)", "label": "<unsafe>",
+		"show": true, "profileURL": "javascript:alert(1)", "label": "<unsafe>",
 		"users": []map[string]any{{"name": "<Alice>"}, {"name": "Bob & Carol"}},
 	}
 	var output bytes.Buffer

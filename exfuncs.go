@@ -1,7 +1,6 @@
 package xtpl
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -23,6 +22,13 @@ func init() {
 	})
 
 	AddFuncEx("get", func(ctx Context, args []reflect.Value) reflect.Value {
+		if len(args) < 2 {
+			return reflect.Value{}
+		}
+		return getProperty(args[0], toString(args[1].Interface()))
+	})
+
+	AddFuncEx("var", func(ctx Context, args []reflect.Value) reflect.Value {
 		return ctx.Get(toString(args[1].Interface()))
 	})
 
@@ -88,23 +94,26 @@ func init() {
 	})
 
 	//------- escape funcs ---
-	AddFunc("_html", func(v any) Raw { return Raw(escapeHTML(v).(string)) })
-	AddFunc("_htmlAttr", func(v any) Raw { return Raw(escapeHTML(v).(string)) })
-	AddFunc("_url", func(v any) Raw { return Raw(escapeHTML(escapeURLNormalize(escapeURLFilter(v))).(string)) })
-	AddFunc("_json", func(v any) Raw { return rawValue(JSON(v)) })
-	AddFunc("_jsstr", func(v any) Raw { return Raw(escapeJSString(v).(string)) })
-	AddFunc("_css", func(v any) Raw { return Raw(escapeCSSValue(v).(string)) })
+	AddFunc("html,htmlAttr", func(v any) Raw { return Raw(escapeHTML(v).(string)) })
+	AddFunc("url", func(v any) Raw { return Raw(escapeHTML(escapeURLNormalize(escapeURLFilter(v))).(string)) })
+	AddFunc("json", func(v any) Raw {
+		if IsNil(v) {
+			return Raw("null")
+		}
+		data, _ := json.Marshal(v)
+		return Raw(data)
+	})
+	AddFunc("jsstr", func(v any) Raw { return Raw(escapeJSString(v).(string)) })
+	AddFunc("css", func(v any) Raw { return Raw(escapeCSSValue(v).(string)) })
 
 	//--- string funcs ---
 	AddFuncEx("raw", func(_ Context, args []reflect.Value) reflect.Value {
 		return reflect.ValueOf(rawValue(args[0].Interface()))
 	})
-	AddFunc("html", HTML)
-	AddFunc("json", JSON)
 	AddFunc("fmt,printf", func(v any, format string) string { return fmt.Sprintf(format, v) })
 	AddFunc("toUpper", func(v any) string { return strings.ToUpper(toString(v)) })
 	AddFunc("toLower", func(v any) string { return strings.ToLower(toString(v)) })
-	AddFunc("escURL", func(a any) string { return url.QueryEscape(toString(a)) })
+	AddFunc("urlQuery", func(a any) string { return url.QueryEscape(toString(a)) })
 	AddFunc("trim", func(v any) string { return strings.TrimSpace(toString(v)) })
 	AddFunc("trimSfx", func(v any, sfx string) string { return strings.TrimSuffix(toString(v), sfx) })
 	AddFunc("trimPfx", func(v any, pfx string) string { return strings.TrimPrefix(toString(v), pfx) })
@@ -258,18 +267,8 @@ func isEmpty(a any, isZero bool) bool {
 	return isZero && v.IsZero()
 }
 
-// HTML returns a reader containing HTML-escaped text. It is not context-aware.
-func HTML(v any) io.Reader {
-	return bytes.NewBufferString(html.EscapeString(toString(v)))
-}
-
-// JSON returns a reader containing JSON. Marshal errors produce empty output.
-func JSON(v any) io.Reader {
-	if IsNil(v) {
-		return bytes.NewBufferString("null")
-	}
-	b, _ := json.Marshal(v)
-	return bytes.NewBuffer(b)
+func htmlReader(v any) io.Reader {
+	return strings.NewReader(html.EscapeString(toString(v)))
 }
 
 // Raw is explicitly trusted output and bypasses automatic escaping in all contexts.
@@ -277,6 +276,9 @@ func JSON(v any) io.Reader {
 type Raw string
 
 func rawValue(v any) Raw {
+	if raw, ok := v.(Raw); ok {
+		return raw
+	}
 	if r, ok := v.(io.Reader); ok {
 		if c, ok := r.(io.Closer); ok {
 			defer c.Close()

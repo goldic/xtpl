@@ -28,7 +28,7 @@ import (
 func main() {
     source := `h1 Hello, {{name}}!
 p Welcome to {{site}}.
-a(href="{{url}}") View profile`
+a(href="{{profileURL}}") View profile`
 
     tpl, err := xtpl.ParsePugTemplate(strings.NewReader(source))
     if err != nil {
@@ -36,9 +36,9 @@ a(href="{{url}}") View profile`
     }
 
     data := map[string]any{
-        "name": "Ada & friends",
-        "site": "Example Club",
-        "url":  "/members/ada",
+        "name":       "Ada & friends",
+        "site":       "Example Club",
+        "profileURL": "/members/ada",
     }
     if err := tpl.Execute(os.Stdout, data); err != nil {
         log.Fatal(err)
@@ -113,7 +113,7 @@ html
 `templates/user.pug`:
 
 ```pug
-li: a(href="{{url}}") {{name}}
+li: a(href="{{profileURL}}") {{name}}
 ```
 
 The included template receives the current value, so `user.pug` sees the user
@@ -147,8 +147,8 @@ func main() {
     data := map[string]any{
         "title": "Members",
         "users": []map[string]any{
-            {"name": "Alice", "url": "/members/alice"},
-            {"name": "Bob", "url": "/members/bob"},
+            {"name": "Alice", "profileURL": "/members/alice"},
+            {"name": "Bob", "profileURL": "/members/bob"},
         },
     }
     if err := templates.Execute(os.Stdout, data); err != nil {
@@ -189,7 +189,7 @@ an escape function. Input is read in full while parsing.
   consumed as they are rendered, so single-use iterators may be exhausted after
   one execution.
 - `{{value.set("$name")}}` stores a variable and returns the value;
-  `{{$name}}` reads it in the same context.
+  `{{$name}}` or `{{var("$name")}}` reads it in the same context.
 - `{{include("/partials/header")}}` renders a named template using the current
   value. Includes need a collection created with `ParseFS` or `ParseDir`.
 - `{{/* comment */}}` is a comment. The expression language is not JavaScript
@@ -220,10 +220,19 @@ Output:
 
 Built-in functions include `empty`, `bool`, `str`, `int`, `float`, `sum`,
 `mul`, `eq`, `lt`, `gt`, `len`, `substr`, `split`, `join`, `map`, `filter`,
-`html`, `json`, `raw`, and `include`. `IsEmpty` treats nil and Go zero values
-as empty; a non-nil empty slice or map is **not** empty. Registered functions
-and object methods can be called from templates. See `exfuncs.go` for the full
-set and their current behavior.
+`html`, `htmlAttr`, `url`, `urlQuery`, `json`, `jsstr`, `css`, `raw`, `get`,
+`var`, and `include`. `IsEmpty` treats nil and Go zero values as empty; a non-nil empty
+slice or map is **not** empty. Registered functions and object methods can be
+called from templates. See `exfuncs.go` for the full set and their current
+behavior.
+
+Registered functions take precedence over object methods and fields with the same name.
+Parentheses do not change this: `{{user.url}}` and `{{user.url()}}` both call
+the `url` function with `user` as its argument. Use `{{user.get("url")}}` to
+read the `url` field or map key instead. `get` also supports values implementing
+the `Getter` interface, and returns an empty value for missing or nil objects.
+For Go structs, use the exported field name or its lower-initial equivalent,
+such as `get("URL")` or `get("name")` for the `URL` and `Name` fields.
 
 The expression evaluator is intentionally tolerant of missing object properties.
 Some invalid function calls and panics are currently suppressed, while some
@@ -268,15 +277,15 @@ import (
 
 func main() {
     source := `p {{message}}
-a(href="{{url}}") Open`
+a(href="{{profileURL}}") Open`
     tpl, err := xtpl.ParsePugTemplate(strings.NewReader(source))
     if err != nil {
         log.Fatal(err)
     }
 
     data := map[string]any{
-        "message": "<b>Hello</b>",
-        "url":     "javascript:alert(1)",
+        "message":    "<b>Hello</b>",
+        "profileURL": "javascript:alert(1)",
     }
     if err := tpl.Execute(os.Stdout, data); err != nil {
         log.Fatal(err)
@@ -311,7 +320,7 @@ parsed templates keep their original behavior. The setting does not change
 
 When disabled, dynamic values are not escaped automatically and the Pug
 context validation described above is also skipped. Explicit functions such as
-`._html` remain available. Only disable auto-escaping when all rendered content
+`.html` remain available. Only disable auto-escaping when all rendered content
 is trusted or handled explicitly. Configure this global setting before
 concurrent parsing, or synchronize access externally.
 
@@ -336,11 +345,14 @@ be used with trusted, context-appropriate content. For example:
 data := map[string]any{"content": xtpl.Raw("<strong>Trusted</strong>")}
 ```
 
-The explicit functions `_html`, `_htmlAttr`, `_url`, `_json`, `_jsstr`, and
-`_css` return raw, already-encoded output for the selected context. They are
+The explicit functions `html`, `htmlAttr`, `url`, `json`, `jsstr`, and
+`css` return raw, already-encoded output for the selected context. They are
 intended for deliberate use in text templates; using the wrong function for a
 context can be unsafe. Pug templates select their encoders automatically.
-`_css` filters a CSS value; it does not sanitize an arbitrary stylesheet.
+`css` filters a CSS value; it does not sanitize an arbitrary stylesheet.
+`urlQuery` encodes a URL query parameter and returns an ordinary string. In a
+Pug URL, prefer a plain expression such as `/search?q={{query}}`: automatic
+escaping already encodes it, and calling `urlQuery` first would encode it twice.
 
 Templates and registered functions are trusted code: they can call methods on
 provided values, and context functions can write directly to output. Never

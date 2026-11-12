@@ -144,7 +144,7 @@ func TestExpression_ToString(t *testing.T) {
 		// vars
 		{`.Par.$.Abc`, OBJ{"Par": 123, "Abc": 456}, `456`},
 		{`.Par.set("$abc").$.$abc`, OBJ{"Par": 123, "Abc": 456}, `123`},
-		{`.Par.set("$abc").$.get("$abc")`, OBJ{"Par": 123, "Abc": 456}, `123`},
+		{`.Par.set("$abc").$.var("$abc")`, OBJ{"Par": 123, "Abc": 456}, `123`},
 	} {
 		expr := NewExpression(v.expr)
 		assertEqual(t, v.result, expr.EvalStr(v.arg))

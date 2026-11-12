@@ -80,7 +80,7 @@ func ParseHTMLTemplate(r io.Reader) (tpl *Template, err error) {
 	if err != nil {
 		return nil, err
 	}
-	tpl.SetDefaultEscapeFunc(HTML)
+	tpl.SetDefaultEscapeFunc(htmlReader)
 	return tpl, nil
 }
 
