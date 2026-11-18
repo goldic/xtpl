@@ -29,6 +29,7 @@ import (
 
 func main() {
     const source = `
+
 h1 Hello, {{name}}!
 p Welcome to {{site}}.
 a(href="{{profileURL}}") View profile
@@ -50,10 +51,16 @@ a(href="{{profileURL}}") View profile
 }
 ```
 
+The HTML output in these examples is formatted for readability. Pug output is
+compact by default; call `xtpl.SetPrettyOutput(true)` before parsing to enable
+formatted output.
+
 Output:
 
 ```html
-<h1>Hello, Ada &amp; friends!</h1><p>Welcome to Example Club.</p><a href="/members/ada">View profile</a>
+<h1>Hello, Ada &amp; friends!</h1>
+<p>Welcome to Example Club.</p>
+<a href="/members/ada">View profile</a>
 ```
 
 Dynamic values are escaped according to their HTML context by default. For
@@ -68,7 +75,8 @@ value is non-empty. Inside the loop, expressions refer to the current item.
 Replace `source` and `data` in the program above with:
 
 ```go
-source := `
+const source = `
+
 h1 {{title}}
 ul
   range users
@@ -90,7 +98,15 @@ data := map[string]any{
 Output:
 
 ```html
-<h1>Members</h1><ul><li><b>Alice</b><span class="online">online</span></li><li><b>Bob</b></li></ul>
+<h1>Members</h1>
+<ul>
+  <li>
+    <b>Alice</b><span class="online">online</span>
+  </li>
+  <li>
+    <b>Bob</b>
+  </li>
+</ul>
 ```
 
 ## Multiple templates with include
@@ -166,11 +182,19 @@ func main() {
 Output:
 
 ```html
-<!DOCTYPE html><html><body><h1>Members</h1><ul><li><a href="/members/alice">Alice</a></li><li><a href="/members/bob">Bob</a></li></ul></body></html>
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1>Members</h1>
+    <ul>
+      <li><a href="/members/alice">Alice</a></li>
+      <li><a href="/members/bob">Bob</a></li>
+    </ul>
+  </body>
+</html>
 ```
 
-`ParseDir` is also available for templates on disk. Call
-`xtpl.SetPrettyOutput(true)` before parsing if you want formatted Pug output.
+`ParseDir` is also available for templates on disk.
 
 `ParseTextTemplate` renders without default escaping. `ParseHTMLTemplate` uses
 HTML text escaping. `ParsePugTemplate` uses [xpug](xpug/README.md) to convert
@@ -221,16 +245,11 @@ ul
 Output:
 
 ```html
-<ul><li>0: Alice</li><li>1: Bob</li></ul>
+<ul>
+  <li>0: Alice</li>
+  <li>1: Bob</li>
+</ul>
 ```
-
-Built-in functions include `empty`, `bool`, `str`, `int`, `float`, `sum`,
-`mul`, `eq`, `lt`, `gt`, `len`, `substr`, `split`, `join`, `map`, `filter`,
-`html`, `htmlAttr`, `url`, `urlQuery`, `json`, `jsstr`, `css`, `raw`, `get`,
-`var`, and `include`. `IsEmpty` treats nil and Go zero values as empty; a non-nil empty
-slice or map is **not** empty. Registered functions and object methods can be
-called from templates. See `exfuncs.go` for the full set and their current
-behavior.
 
 Registered functions take precedence over object methods and fields with the same name.
 Parentheses do not change this: `{{user.url}}` and `{{user.url()}}` both call
@@ -244,6 +263,163 @@ The expression evaluator is intentionally tolerant of missing object properties.
 Some invalid function calls and panics are currently suppressed, while some
 other errors, such as an out-of-range direct slice access, are returned by
 `Execute`. Do not rely on suppression to validate template input.
+
+## Built-in functions
+
+Functions can be chained: the value before the function becomes its first
+argument. Parentheses are optional when there are no additional arguments.
+For example, with `name` set to `"  Ada  "`, `price` to `12.3`, `tags` to
+`[]string{"go", "html"}`, and `score` to `12`:
+
+- `{{name.trim.toUpper}}` → `ADA`
+- `{{price.printf("%.2f")}}` → `12.30`
+- `{{tags.map(".toUpper").join(", ")}}` → `GO, HTML`
+- `{{score.gte(10).if("pass", "retry")}}` → `pass`
+
+### Values and conversions
+
+- `empty`, `not` — report whether a value is empty.
+- `bool` — reports whether a value is non-empty.
+- `nil` — returns a nil value.
+- `str`, `string` — convert a value to a string.
+- `int`, `uint`, `float` — convert a value to an integer, unsigned integer,
+  or floating-point number, respectively.
+
+Empty means nil or a Go zero value. A non-nil empty slice or map is **not**
+empty. When rendered as text, `true` is `1` and `false` is an empty string.
+
+### Numbers
+
+- `abs` — absolute value.
+- `ceil`, `floor`, `round` — round a number up, down, or to the nearest integer.
+- `sum`, `add` — sum the value and additional arguments.
+- `sub` — subtract the argument from the value.
+- `mul` — multiply the value and additional arguments.
+- `div` — divide the value by the argument.
+- `mod` — integer remainder.
+- `fmod` — floating-point remainder.
+
+### Strings and collections
+
+- `fmt`, `printf` — format a value using a Go format string, as in
+  `{{price.printf("%.2f")}}`.
+- `toUpper`, `toLower` — change letter case.
+- `trim` — remove leading and trailing whitespace.
+- `trimPfx`, `trimSfx` — remove a specified prefix or suffix.
+- `substr(start, length)` — return a substring by rune position; length is
+  optional, and a negative start counts from the end.
+- `concat` — concatenate values as strings.
+- `split` — split a string using a separator.
+- `join` — join collection elements as strings using a separator.
+- `len` — return the length of a string, array, slice, or map. String length
+  is measured in bytes.
+- `idx`, `index` — return an array or slice element by index, or an empty value
+  if the index is out of bounds: `{{users.index(0)}}`.
+- `map` — evaluate an expression for every element and return the results,
+  for example `{{users.map(".name")}}`.
+- `filter` — return the non-empty elements of a collection.
+
+### Conditions and comparisons
+
+- `and` — return the first empty argument, or the last argument if all are
+  non-empty.
+- `or` — return the first non-empty argument, or nil.
+- `if` — return the first choice if the value is non-empty, otherwise the
+  optional second choice: `{{online.if("online", "offline")}}`.
+- `case` — match a value against pairs of choices, with an optional default:
+  `{{status.case(1, "new", 2, "ready", "unknown")}}`.
+- `eq`, `equal` — compare values for equality.
+- `lt`, `lte`, `gt`, `gte` — compare values using `<`, `<=`, `>`, or `>=`.
+- `cmp` — compare values and return a negative number, zero, or a positive
+  number.
+
+Function arguments are evaluated before the function is called; `and`, `or`,
+`if`, and `case` do not short-circuit their arguments. The `if` function in an
+expression is separate from the `if` block directive.
+
+### Escaping and serialization
+
+- `html`, `htmlAttr` — escape a value for HTML text or a quoted HTML attribute.
+- `url` — filter unsafe URL schemes and escape the result for an HTML attribute.
+- `urlQuery` — encode a URL query parameter.
+- `json` — serialize a value as JSON. Serialization errors are ignored.
+- `jsstr` — escape a JavaScript string value.
+- `css` — filter a CSS property value.
+- `raw` — mark a value as trusted output without escaping it.
+
+Except for `urlQuery`, these functions return `Raw` and bypass further automatic
+escaping. Only use their output in the context for which it is safe. Pug
+templates normally select the appropriate escaping automatically; see
+[automatic escaping](#automatic-escaping-for-pug).
+
+### Dates and time
+
+- `now` — return the current local time as `2006-01-02 15:04:05`.
+- `timestamp` — return the current Unix time in seconds, including fractions.
+- `timeformat`, `tfmt` — format a time value using a Go time layout, for
+  example `{{createdAt.tfmt("2006-01-02")}}`.
+- `year`, `month`, `day` — return the corresponding part of a time value.
+
+### Properties, variables, and templates
+
+- `get` — access a field or map key, including one whose name matches a
+  function: `{{user.get("url")}}`.
+- `set` — store the value in a template variable and return it:
+  `{{name.set("$name")}}`.
+- `var` — read a template variable: `{{var("$name")}}`.
+- `include` — render a named template with the current value:
+  `{{include("/partials/header")}}`.
+- `cache` — enable expression caching with an optional initial capacity; a
+  non-positive capacity disables it. For example, `{{cache(10)}}`.
+- `trace` — write diagnostic context information to the template output.
+
+## Custom functions
+
+Register a Go function with `xtpl.AddFunc` to make it available in expressions:
+
+```go
+package main
+
+import (
+    "log"
+    "os"
+    "strings"
+
+    "github.com/goldic/xtpl"
+)
+
+var _ = xtpl.AddFunc("greet", func(name, greeting string) string {
+    return greeting + ", " + name + "!"
+})
+
+func main() {
+    const source = `p {{name.greet("Hello")}}`
+    tpl, err := xtpl.ParsePugTemplate(strings.NewReader(source))
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    data := map[string]any{"name": "Ada & friends"}
+    if err := tpl.Execute(os.Stdout, data); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+Output:
+
+```html
+<p>Hello, Ada &amp; friends!</p>
+```
+
+In `name.greet("Hello")`, `name` is passed as the first argument and `"Hello"`
+as the second. The returned string is automatically escaped for its Pug output
+context. Registered functions are global and take precedence over object fields
+and methods with the same name. Register them during initialization, before
+concurrent template execution.
+
+For functions that need access to the template context, use
+[`AddFuncEx`](https://pkg.go.dev/github.com/goldic/xtpl#AddFuncEx).
 
 ## Optional web functions
 
@@ -296,7 +472,8 @@ import (
 func main() {
     const source = `
 p {{message}}
-a(href="{{profileURL}}") Open`
+a(href="{{profileURL}}") Open
+`
     tpl, err := xtpl.ParsePugTemplate(strings.NewReader(source))
     if err != nil {
         log.Fatal(err)

@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-    source := `doctype html
+    const source = `doctype html
 html
   body
     h1 Hello
